@@ -10,7 +10,7 @@ quote = price × 1.2 × fx + weight × fx × shipping
 ## Behaviour carried over from the Android app
 
 - Same formula, rounded half-up to a whole number.
-- Same defaults: FX `22.5`, Shipping `26`.
+- Same FX default of `22.5`. Shipping defaults to `18` (the Android app shipped `26`).
 - Invalid or empty input leaves the previous quote on screen rather than erroring.
 
 ## What changed

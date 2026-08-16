@@ -17,8 +17,11 @@ const values = (overrides: Partial<Values> = {}): Values => ({
 
 describe("calculate", () => {
   it("applies price * 1.2 * fx + weight * fx * shipping", () => {
+    // Rates are stated explicitly so this stays true when the defaults change.
     // 100 * 1.2 * 22.5 = 2700, plus 2 * 22.5 * 26 = 1170.
-    expect(calculate(values({ price: "100", weight: "2" }))).toBe("3870");
+    expect(
+      calculate({ fx: "22.5", shipping: "26", price: "100", weight: "2" }),
+    ).toBe("3870");
   });
 
   it("rounds to a whole number, half up", () => {
@@ -36,7 +39,7 @@ describe("calculate", () => {
 
   it("uses the stock defaults for fx and shipping", () => {
     expect(DEFAULTS.fx).toBe("22.5");
-    expect(DEFAULTS.shipping).toBe("26");
+    expect(DEFAULTS.shipping).toBe("18");
   });
 
   it("returns null when a field is empty, so the previous quote stays put", () => {

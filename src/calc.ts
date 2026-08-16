@@ -23,7 +23,7 @@ const STORAGE_KEYS: Record<Field, string> = {
 /** Same defaults the Android app seeded its EditTexts with. */
 export const DEFAULTS: Values = {
   fx: "22.5",
-  shipping: "26",
+  shipping: "18",
   price: "",
   weight: "",
 };
