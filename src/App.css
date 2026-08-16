@@ -253,3 +253,21 @@
   cursor: pointer;
   touch-action: manipulation;
 }
+
+.field {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Says what the weight was understood to mean, so an inferred unit is visible. */
+.field-note {
+  margin: 0 0 4px;
+  padding-left: 78px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--color-primary);
+}
+
+.field-note[data-tone="warn"] {
+  color: var(--color-warn);
+}

@@ -7,6 +7,9 @@ import {
   kilogramsToGrams,
   loadHistory,
   migrate,
+  readWeight,
+  MAX_WEIGHT_G,
+  MIN_WEIGHT_G,
   type HistoryEntry,
   type Values,
 } from "./calc";
@@ -176,5 +179,100 @@ describe("kilogramsToGrams", () => {
   it("passes through anything it cannot parse", () => {
     expect(kilogramsToGrams("")).toBe("");
     expect(kilogramsToGrams("abc")).toBe("abc");
+  });
+});
+
+describe("readWeight", () => {
+  // grams === null means "no usable number", which leaves the quote untouched.
+  const cases: Array<{
+    input: string;
+    grams: number | null;
+    corrected?: boolean;
+    underMin?: boolean;
+    overMax?: boolean;
+    why: string;
+  }> = [
+    // --- nothing usable -----------------------------------------------------
+    { input: "", grams: null, why: "empty field" },
+    { input: "   ", grams: null, why: "whitespace only" },
+    { input: "abc", grams: null, why: "not a number" },
+    { input: ".", grams: null, why: "a lone decimal point" },
+    { input: "1.2.3", grams: null, why: "two decimal points" },
+    { input: "-5", grams: null, why: "negative grams are meaningless" },
+    { input: "-0.5", grams: null, why: "negative kilograms too" },
+
+    // --- decimals are always kilograms -------------------------------------
+    { input: ".33", grams: 330, corrected: true, why: "no leading zero" },
+    { input: "0.33", grams: 330, corrected: true, why: "with leading zero" },
+    { input: "0,33", grams: 330, corrected: true, why: "comma decimal key" },
+    { input: "1.5", grams: 1500, corrected: true, why: "1.5 kg" },
+    { input: "0.5", grams: 500, corrected: true, why: "half a kilo" },
+    { input: "2.0", grams: 2000, corrected: true, why: "trailing .0 is still 2 kg" },
+    { input: "0.02", grams: 20, corrected: true, why: "exactly the lightest SKU" },
+
+    // --- whole numbers too light to be grams are kilograms ------------------
+    { input: "1", grams: 1000, corrected: true, why: "1 g is below the 20 g floor" },
+    { input: "2", grams: 2000, corrected: true, why: "2 kg is the heaviest SKU" },
+
+    // --- whole numbers inside the gram range are taken at face value --------
+    { input: "20", grams: 20, why: "the lightest SKU, exactly" },
+    { input: "33", grams: 33, why: "33 is grams, definitely not 33 kg" },
+    { input: "330", grams: 330, why: "a typical parcel" },
+    { input: "500", grams: 500, why: "top of the usual range" },
+    { input: "1500", grams: 1500, why: "a heavy but real parcel" },
+    { input: "2000", grams: 2000, why: "the heaviest SKU, exactly" },
+    { input: "1e3", grams: 1000, why: "exponent notation still parses" },
+
+    // --- neither reading fits: flagged, not silently bent ------------------
+    { input: "0", grams: 0, why: "mid-typing, so no warning" },
+    { input: "3", grams: 3, underMin: true, why: "3 kg exceeds max, so 3 g" },
+    { input: "19", grams: 19, underMin: true, why: "just under the lightest SKU" },
+    { input: "5.", grams: 5, underMin: true, why: "half-typed decimal" },
+    { input: "0.019", grams: 19, corrected: true, underMin: true, why: "19 g in kg form" },
+    { input: "2.5", grams: 2500, corrected: true, overMax: true, why: "over the 2 kg max" },
+    { input: "2001", grams: 2001, overMax: true, why: "one gram too heavy" },
+    { input: "3300", grams: 3300, overMax: true, why: "well over the max" },
+  ];
+
+  for (const c of cases) {
+    it(`"${c.input}" -> ${c.grams === null ? "no reading" : c.grams + " g"} (${c.why})`, () => {
+      expect(readWeight(c.input)).toEqual({
+        grams: c.grams,
+        corrected: c.corrected ?? false,
+        underMin: c.underMin ?? false,
+        overMax: c.overMax ?? false,
+      });
+    });
+  }
+
+  it("never reports a value outside the range as in-range", () => {
+    for (const c of cases) {
+      const r = readWeight(c.input);
+      if (r.grams === null) continue;
+      expect(r.underMin).toBe(r.grams > 0 && r.grams < MIN_WEIGHT_G);
+      expect(r.overMax).toBe(r.grams > MAX_WEIGHT_G);
+    }
+  });
+
+  it("reads every whole number in the SKU range as grams, unchanged", () => {
+    for (let g = MIN_WEIGHT_G; g <= MAX_WEIGHT_G; g += 1) {
+      const r = readWeight(String(g));
+      expect(r).toMatchObject({ grams: g, corrected: false, underMin: false, overMax: false });
+    }
+  });
+
+  it("agrees with itself: typing kg or the equivalent grams gives one quote", () => {
+    const rates = { fx: "22.5", shipping: "18", price: "100" };
+    for (const [kg, grams] of [
+      [".33", "330"],
+      ["0.5", "500"],
+      ["1.5", "1500"],
+      ["2", "2000"],
+      ["1", "1000"],
+    ]) {
+      expect(calculate({ ...rates, weight: kg })).toBe(
+        calculate({ ...rates, weight: grams }),
+      );
+    }
   });
 });

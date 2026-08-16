@@ -6,6 +6,10 @@ import {
   load,
   loadHistory,
   migrate,
+  readWeight,
+  GRAMS_PER_KG,
+  MAX_WEIGHT_G,
+  MIN_WEIGHT_G,
   save,
   saveHistory,
   type Field,
@@ -19,8 +23,8 @@ const LABELS: Record<
   { label: string; placeholder: string; inputMode: "decimal" | "numeric" }
 > = {
   price: { label: "Price", placeholder: "Price", inputMode: "decimal" },
-  // Grams are whole numbers, so this gets the keypad without a decimal point.
-  weight: { label: "Weight", placeholder: "Grams", inputMode: "numeric" },
+  // Decimal, not numeric: the keypad has to offer a dot so ".33" can be typed.
+  weight: { label: "Weight", placeholder: "330 or 0.33", inputMode: "decimal" },
   fx: { label: "FX", placeholder: "AUD/THB", inputMode: "decimal" },
   shipping: { label: "Shipping", placeholder: "AUD/KG", inputMode: "decimal" },
 };
@@ -28,6 +32,35 @@ const LABELS: Record<
 /** The two values that change on every quote, versus the ones that rarely do. */
 const PER_QUOTE: Field[] = ["price", "weight"];
 const RATES: Field[] = ["fx", "shipping"];
+
+/**
+ * What the weight field was understood to mean, shown under it so an inferred
+ * unit is never silent.
+ */
+function weightNote(
+  raw: string,
+): { text: string; tone: "info" | "warn" } | null {
+  const { grams, corrected, underMin, overMax } = readWeight(raw);
+  if (grams === null) return null;
+
+  const read = corrected
+    ? `${normalizeForDisplay(raw)} kg = ${grams} g`
+    : `${grams} g`;
+
+  if (overMax)
+    return {
+      text: `${read} · over the ${MAX_WEIGHT_G / GRAMS_PER_KG} kg max`,
+      tone: "warn",
+    };
+  if (underMin)
+    return { text: `${read} · under the ${MIN_WEIGHT_G} g min`, tone: "warn" };
+  return corrected ? { text: read, tone: "info" } : null;
+}
+
+/** Echoes the typed number back with a comma decimal shown as a dot. */
+function normalizeForDisplay(raw: string): string {
+  return raw.trim().replace(",", ".");
+}
 
 /** Restores the previous session and its result in one read. */
 function initialState(): { values: Values; quote: string } {
@@ -171,7 +204,25 @@ export default function App() {
         {quote}
       </output>
 
-      <section className="group">{PER_QUOTE.map(renderRow)}</section>
+      <section className="group">
+        {PER_QUOTE.map((field) => {
+          const note = field === "weight" ? weightNote(values.weight) : null;
+          return (
+            <div className="field" key={field}>
+              {renderRow(field)}
+              {note && (
+                <p
+                  className="field-note"
+                  data-tone={note.tone}
+                  aria-live="polite"
+                >
+                  {note.text}
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </section>
 
       <section className="group group-rates">
         <h2 className="group-title">Rates</h2>
@@ -209,7 +260,8 @@ export default function App() {
                 >
                   <span className="history-quote">{entry.quote}</span>
                   <span className="history-detail">
-                    {entry.values.price} &times; {entry.values.weight}g
+                    {entry.values.price} &times;{" "}
+                    {readWeight(entry.values.weight).grams ?? 0}g
                     <span className="history-rates">
                       {" "}
                       @ {entry.values.fx} / {entry.values.shipping}

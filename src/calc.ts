@@ -36,17 +36,108 @@ export const INITIAL_QUOTE = "Quote";
  * a plain finite number, including the empty string.
  */
 function parse(value: string): number {
-  const trimmed = value.trim();
+  const trimmed = normalize(value);
   if (trimmed === "") return NaN;
   const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : NaN;
+}
+
+/**
+ * Trims, and accepts a comma decimal separator — some mobile keyboards put a
+ * comma on the decimal key, which would otherwise parse as NaN.
+ */
+function normalize(value: string): string {
+  return value.trim().replace(",", ".");
 }
 
 /** Weight is entered in grams; the shipping rate is per kilogram. */
 export const GRAMS_PER_KG = 1000;
 
 /**
- * quote = price * 1.2 * fx + (weight / 1000) * fx * shipping
+ * The real range of the catalogue: the lightest SKU is 20 g, the heaviest 2 kg.
+ * This is what lets the unit be inferred instead of guessed.
+ */
+export const MIN_WEIGHT_G = 20;
+export const MAX_WEIGHT_G = 2000;
+
+export type WeightReading = {
+  /** Grams, or null when the field is blank or unparseable. */
+  grams: number | null;
+  /** The typed number was read as kilograms rather than grams. */
+  corrected: boolean;
+  /** Heavier than any real SKU — shown as a warning, still calculated. */
+  overMax: boolean;
+  /** Lighter than any real SKU — shown as a warning, still calculated. */
+  underMin: boolean;
+};
+
+const inRange = (grams: number) =>
+  grams >= MIN_WEIGHT_G && grams <= MAX_WEIGHT_G;
+
+/**
+ * Reads the weight field, inferring the unit from the magnitude.
+ *
+ * Every real item weighs 20 g to 2000 g, so for a given number at most one of
+ * "grams" and "kilograms" usually lands in that range:
+ *
+ *   ".33" / "0.33" / "1.5"  -> kilograms. Fractional grams never occur.
+ *   "1" / "2"               -> kilograms. 1 g is below the lightest SKU.
+ *   "20" / "33" / "1500"    -> grams, at face value. 33 kg is not a parcel.
+ *
+ * Genuinely out-of-range input is still calculated, but flagged rather than
+ * silently bent into shape. The typed text is never rewritten — the caller
+ * shows what was assumed instead.
+ */
+export function readWeight(raw: string): WeightReading {
+  const blank: WeightReading = {
+    grams: null,
+    corrected: false,
+    underMin: false,
+    overMax: false,
+  };
+
+  const trimmed = normalize(raw);
+  if (trimmed === "") return blank;
+
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed < 0) return blank;
+
+  const asGrams = parsed;
+  const asKilograms = Math.round(parsed * GRAMS_PER_KG);
+
+  let grams: number;
+  let corrected: boolean;
+
+  if (!Number.isInteger(parsed)) {
+    // A decimal point only ever means kilograms.
+    grams = asKilograms;
+    corrected = true;
+  } else if (inRange(asGrams)) {
+    grams = asGrams;
+    corrected = false;
+  } else if (inRange(asKilograms)) {
+    // Too light to be grams, so it was kilograms: "2" -> 2000 g.
+    grams = asKilograms;
+    corrected = true;
+  } else {
+    // Neither reading fits. Grams is the closer of the two for a number like
+    // "19" (19 g is just light; 19 kg is nine times the heaviest parcel).
+    grams = asGrams;
+    corrected = false;
+  }
+
+  return {
+    grams,
+    corrected,
+    // A bare 0 is almost always mid-typing ("0" on the way to "0.33"), so it
+    // is not worth warning about.
+    underMin: grams > 0 && grams < MIN_WEIGHT_G,
+    overMax: grams > MAX_WEIGHT_G,
+  };
+}
+
+/**
+ * quote = price * 1.2 * fx + (weight_kg) * fx * shipping
  *
  * Returns null when any input fails to parse. The Android version swallowed the
  * NumberFormatException and left the previous quote on screen, so callers should
@@ -55,10 +146,10 @@ export const GRAMS_PER_KG = 1000;
 export function calculate(values: Values): string | null {
   const fx = parse(values.fx);
   const price = parse(values.price);
-  const grams = parse(values.weight);
   const shipping = parse(values.shipping);
+  const { grams } = readWeight(values.weight);
 
-  if ([fx, price, grams, shipping].some(Number.isNaN)) return null;
+  if (grams === null || [fx, price, shipping].some(Number.isNaN)) return null;
 
   const quote = price * 1.2 * fx + (grams / GRAMS_PER_KG) * fx * shipping;
   if (!Number.isFinite(quote)) return null;

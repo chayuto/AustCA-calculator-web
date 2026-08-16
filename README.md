@@ -27,6 +27,20 @@ quote = price × 1.2 × fx + (weight_g / 1000) × fx × shipping
 - **Weight is entered in grams**, not kilograms — most parcels are 100–500 g, and
   typing `330` beats typing `0.33` on a phone. The shipping rate stays AUD per kg.
   A one-time migration rescales any weight and history already stored on the device.
+- **The weight unit is inferred.** Every SKU weighs between 20 g and 2 kg, so for
+  any typed number at most one of "grams" and "kilograms" normally lands in range:
+
+  | typed | read as | why |
+  |---|---|---|
+  | `.33`, `0.33`, `1.5` | 330 g, 330 g, 1500 g | fractional grams never occur |
+  | `1`, `2` | 1000 g, 2000 g | 1 g is below the lightest SKU |
+  | `20`, `33`, `330`, `2000` | as typed | already in the gram range |
+  | `19`, `3` | 19 g, 3 g — flagged | too light; 19 kg is not a parcel either |
+  | `2.5`, `3300` | 2500 g, 3300 g — flagged | over the 2 kg max |
+
+  The typed text is never rewritten while you type. Instead a line under the field
+  says what was assumed (`.33 kg = 330 g`), and out-of-range weights are flagged in
+  red but still calculated. A comma decimal key (`0,33`) is accepted too.
 - **Layout.** Price and Weight sit at the top since they change every time; FX and
   Shipping are demoted to a `Rates` group. The result is pinned above the inputs so
   it stays visible when the keyboard is up.
