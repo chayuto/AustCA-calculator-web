@@ -1,0 +1,255 @@
+.panel {
+  flex: 1;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 12px;
+  padding-top: calc(12px + env(safe-area-inset-top));
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  padding-left: calc(12px + env(safe-area-inset-left));
+  padding-right: calc(12px + env(safe-area-inset-right));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* The live result, kept at the top so it stays on screen with the keyboard up. */
+.quote {
+  display: block;
+  padding: 20px 12px;
+  text-align: center;
+  font-size: clamp(36px, 13vw, 52px);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  color: var(--color-quote);
+  background: var(--color-quote-bg);
+  border-radius: 12px;
+  /* Reserves the line so the layout doesn't jump on the first calculation. */
+  min-height: 1.1em;
+  overflow-wrap: anywhere;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.group-rates {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-divider);
+}
+
+.group-title {
+  margin: 0 0 2px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-hint);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.row-label {
+  flex: 0 0 68px;
+  font-size: 15px;
+}
+
+.row-input {
+  flex: 1;
+  /* Lets the input shrink inside the flex row on very narrow phones. */
+  min-width: 0;
+  font: inherit;
+  /* 22px both matches the original 20sp and clears the 16px threshold below
+     which iOS Safari zooms the page in on focus. */
+  font-size: 22px;
+  color: inherit;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-underline);
+  border-radius: 0;
+  padding: 10px 2px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.row-input::placeholder {
+  color: var(--color-hint);
+}
+
+.row-input:focus {
+  outline: none;
+  border-bottom: 2px solid var(--color-primary);
+  padding-bottom: 9px;
+}
+
+.btn {
+  font: inherit;
+  font-weight: 500;
+  color: #fff;
+  background: var(--color-accent);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  /* Stops a double-tap from zooming the page. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn:active {
+  filter: brightness(0.88);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--color-primary-dark);
+  outline-offset: 2px;
+}
+
+/* Compact and quiet so the input keeps the width on a narrow screen and the
+   primary action stays the only loud thing on the page. */
+.btn-clear {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  font-size: 24px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  color: var(--color-hint);
+  background: transparent;
+}
+
+.btn-clear:active {
+  background: var(--color-quote-bg);
+  filter: none;
+}
+
+.btn-calculate {
+  margin-top: 4px;
+  padding: 18px;
+  font-size: 22px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* ---------------------------------------------------------------- history */
+
+.history {
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.history-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 4px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-hint);
+  background: none;
+  border: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.history-toggle:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.history-chevron {
+  display: inline-block;
+  font-size: 12px;
+  line-height: 1;
+  transition: transform 120ms ease;
+}
+
+.history-chevron[data-open="true"] {
+  transform: rotate(90deg);
+}
+
+.history-count {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  /* Long histories scroll inside the panel rather than the page. */
+  max-height: 46vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.history-entry {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 4px;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--color-divider);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.history-entry:active {
+  background: var(--color-quote-bg);
+}
+
+.history-quote {
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.history-detail {
+  font-size: 13px;
+  color: var(--color-hint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Secondary to the price/weight that actually identify the quote. */
+.history-rates {
+  opacity: 0.75;
+}
+
+.history-when {
+  font-size: 12px;
+  color: var(--color-hint);
+  white-space: nowrap;
+}
+
+.history-clear {
+  width: 100%;
+  padding: 14px 4px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--color-accent);
+  background: none;
+  border: none;
+  border-top: 1px solid var(--color-divider);
+  cursor: pointer;
+  touch-action: manipulation;
+}

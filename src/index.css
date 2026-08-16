@@ -1,0 +1,45 @@
+:root {
+  /* Carried over from the Android res/values/colors.xml */
+  --color-primary: #008577;
+  --color-primary-dark: #00574b;
+  --color-accent: #d81b60;
+  --color-quote: #0f0d18;
+  --color-quote-bg: #f1f3f2;
+
+  --color-surface: #ffffff;
+  --color-text: #1c1b1f;
+  --color-hint: #8a8a8e;
+  --color-underline: #b9b9be;
+  --color-divider: #e4e4e8;
+
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--color-surface);
+}
+
+body {
+  margin: 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family:
+    Roboto,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Helvetica,
+    Arial,
+    sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
