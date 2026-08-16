@@ -3,7 +3,7 @@
  * cache-first strategy is safe for them; the HTML entry point is revalidated in
  * the background so a redeploy is picked up on the next visit.
  */
-const CACHE = "austca-cal-v3";
+const CACHE = "austca-cal-v4";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
