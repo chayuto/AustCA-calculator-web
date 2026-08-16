@@ -42,8 +42,11 @@ function parse(value: string): number {
   return Number.isFinite(parsed) ? parsed : NaN;
 }
 
+/** Weight is entered in grams; the shipping rate is per kilogram. */
+export const GRAMS_PER_KG = 1000;
+
 /**
- * quote = price * 1.2 * fx + weight * fx * shipping
+ * quote = price * 1.2 * fx + (weight / 1000) * fx * shipping
  *
  * Returns null when any input fails to parse. The Android version swallowed the
  * NumberFormatException and left the previous quote on screen, so callers should
@@ -52,12 +55,12 @@ function parse(value: string): number {
 export function calculate(values: Values): string | null {
   const fx = parse(values.fx);
   const price = parse(values.price);
-  const weight = parse(values.weight);
+  const grams = parse(values.weight);
   const shipping = parse(values.shipping);
 
-  if ([fx, price, weight, shipping].some(Number.isNaN)) return null;
+  if ([fx, price, grams, shipping].some(Number.isNaN)) return null;
 
-  const quote = price * 1.2 * fx + weight * fx * shipping;
+  const quote = price * 1.2 * fx + (grams / GRAMS_PER_KG) * fx * shipping;
   if (!Number.isFinite(quote)) return null;
 
   // Matches String.format("%.0f", quote) — half-up to a whole number.
@@ -139,6 +142,56 @@ export function saveHistory(entries: HistoryEntry[]): void {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(entries));
   } catch {
     // Not worth interrupting a calculation over.
+  }
+}
+
+/* ---------------------------------------------------------------- migration */
+
+const SCHEMA_KEY = "PREF_SCHEMA";
+
+/** 2 = weight is stored in grams. Anything earlier stored it in kilograms. */
+const SCHEMA_VERSION = 2;
+
+/** "0.33" kg -> "330" g. Non-numeric or blank values are left untouched. */
+export function kilogramsToGrams(raw: string): string {
+  const trimmed = raw.trim();
+  const parsed = Number(trimmed);
+  if (trimmed === "" || !Number.isFinite(parsed)) return raw;
+  // Grams are fine as whole numbers at the scale this app deals with.
+  return String(Math.round(parsed * GRAMS_PER_KG));
+}
+
+/**
+ * Rewrites anything already on the device into the current schema. Without this,
+ * a stored "2" meaning 2 kg would silently start meaning 2 g.
+ *
+ * Must run before the first load().
+ */
+export function migrate(): void {
+  try {
+    if (Number(localStorage.getItem(SCHEMA_KEY)) >= SCHEMA_VERSION) return;
+
+    const weight = localStorage.getItem(STORAGE_KEYS.weight);
+    if (weight !== null) {
+      localStorage.setItem(STORAGE_KEYS.weight, kilogramsToGrams(weight));
+    }
+
+    const history = loadHistory();
+    if (history.length > 0) {
+      saveHistory(
+        history.map((entry) => ({
+          ...entry,
+          values: {
+            ...entry.values,
+            weight: kilogramsToGrams(entry.values.weight),
+          },
+        })),
+      );
+    }
+
+    localStorage.setItem(SCHEMA_KEY, String(SCHEMA_VERSION));
+  } catch {
+    // A failed migration must not stop the app from opening.
   }
 }
 

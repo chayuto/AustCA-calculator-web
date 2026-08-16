@@ -4,7 +4,7 @@ Mobile-first web version of the [AustCA-calculator](https://github.com/chayuto/A
 Android app. Quote calculator for FX, shipping, price and weight.
 
 ```
-quote = price × 1.2 × fx + weight × fx × shipping
+quote = price × 1.2 × fx + (weight_g / 1000) × fx × shipping
 ```
 
 ## Behaviour carried over from the Android app
@@ -24,6 +24,9 @@ quote = price × 1.2 × fx + weight × fx × shipping
 - **History.** The last 20 calculations are kept. Tap one to load its inputs back
   into the form. Repeating a calculation refreshes the existing entry instead of
   duplicating it.
+- **Weight is entered in grams**, not kilograms — most parcels are 100–500 g, and
+  typing `330` beats typing `0.33` on a phone. The shipping rate stays AUD per kg.
+  A one-time migration rescales any weight and history already stored on the device.
 - **Layout.** Price and Weight sit at the top since they change every time; FX and
   Shipping are demoted to a `Rates` group. The result is pinned above the inputs so
   it stays visible when the keyboard is up.

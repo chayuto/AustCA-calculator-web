@@ -1,9 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   DEFAULTS,
   HISTORY_LIMIT,
   addToHistory,
   calculate,
+  kilogramsToGrams,
+  loadHistory,
+  migrate,
   type HistoryEntry,
   type Values,
 } from "./calc";
@@ -16,25 +19,36 @@ const values = (overrides: Partial<Values> = {}): Values => ({
 });
 
 describe("calculate", () => {
-  it("applies price * 1.2 * fx + weight * fx * shipping", () => {
+  it("applies price * 1.2 * fx + (weight / 1000) * fx * shipping", () => {
     // Rates are stated explicitly so this stays true when the defaults change.
-    // 100 * 1.2 * 22.5 = 2700, plus 2 * 22.5 * 26 = 1170.
+    // 100 * 1.2 * 22.5 = 2700, plus 2kg * 22.5 * 26 = 1170.
     expect(
-      calculate({ fx: "22.5", shipping: "26", price: "100", weight: "2" }),
+      calculate({ fx: "22.5", shipping: "26", price: "100", weight: "2000" }),
     ).toBe("3870");
   });
 
+  it("treats the weight field as grams against a per-kilogram rate", () => {
+    // A 330 g parcel at 18 AUD/kg and fx 1: 0.33 * 18 = 5.94 -> 6.
+    expect(
+      calculate({ fx: "1", shipping: "18", price: "0", weight: "330" }),
+    ).toBe("6");
+    // Ten times the weight is ten times the shipping component.
+    expect(
+      calculate({ fx: "1", shipping: "18", price: "0", weight: "3300" }),
+    ).toBe("59");
+  });
+
   it("rounds to a whole number, half up", () => {
-    // With fx and shipping at 1 and price at 0 the quote is just the weight,
+    // With fx and shipping at 1 and price at 0 the quote is the weight in kg,
     // which keeps these exactly representable and the rounding unambiguous.
-    const fromWeight = (weight: string) =>
+    const fromGrams = (weight: string) =>
       calculate({ fx: "1", shipping: "1", price: "0", weight });
 
-    expect(fromWeight("0.5")).toBe("1");
-    expect(fromWeight("1.5")).toBe("2");
-    expect(fromWeight("2.5")).toBe("3");
-    expect(fromWeight("0.4")).toBe("0");
-    expect(fromWeight("1.75")).toBe("2");
+    expect(fromGrams("500")).toBe("1");
+    expect(fromGrams("1500")).toBe("2");
+    expect(fromGrams("2500")).toBe("3");
+    expect(fromGrams("400")).toBe("0");
+    expect(fromGrams("1750")).toBe("2");
   });
 
   it("uses the stock defaults for fx and shipping", () => {
@@ -97,5 +111,70 @@ describe("addToHistory", () => {
     );
     expect(history).toHaveLength(2);
     expect(history[0]).toMatchObject({ quote: "1", at: 3 });
+  });
+});
+
+describe("migrate", () => {
+  class MemoryStorage {
+    private data = new Map<string, string>();
+    getItem(key: string) {
+      return this.data.has(key) ? this.data.get(key)! : null;
+    }
+    setItem(key: string, value: string) {
+      this.data.set(key, value);
+    }
+    clear() {
+      this.data.clear();
+    }
+  }
+
+  beforeEach(() => {
+    globalThis.localStorage = new MemoryStorage() as unknown as Storage;
+  });
+
+  it("converts a stored kilogram weight into grams, once", () => {
+    localStorage.setItem("PREF_WEIGHT", "0.33");
+    migrate();
+    expect(localStorage.getItem("PREF_WEIGHT")).toBe("330");
+
+    // Running again must not multiply it a second time.
+    migrate();
+    expect(localStorage.getItem("PREF_WEIGHT")).toBe("330");
+  });
+
+  it("converts weights inside history too", () => {
+    localStorage.setItem(
+      "PREF_HISTORY",
+      JSON.stringify([
+        { quote: "3870", at: 1, values: values({ price: "100", weight: "2" }) },
+      ]),
+    );
+    migrate();
+    expect(loadHistory()[0].values.weight).toBe("2000");
+  });
+
+  it("leaves a blank or unparseable weight alone", () => {
+    localStorage.setItem("PREF_WEIGHT", "");
+    migrate();
+    expect(localStorage.getItem("PREF_WEIGHT")).toBe("");
+  });
+
+  it("is a no-op on a device with nothing stored", () => {
+    migrate();
+    expect(localStorage.getItem("PREF_WEIGHT")).toBeNull();
+    expect(loadHistory()).toEqual([]);
+  });
+});
+
+describe("kilogramsToGrams", () => {
+  it("scales by 1000 and rounds to whole grams", () => {
+    expect(kilogramsToGrams("0.33")).toBe("330");
+    expect(kilogramsToGrams("2")).toBe("2000");
+    expect(kilogramsToGrams("0.1235")).toBe("124");
+  });
+
+  it("passes through anything it cannot parse", () => {
+    expect(kilogramsToGrams("")).toBe("");
+    expect(kilogramsToGrams("abc")).toBe("abc");
   });
 });

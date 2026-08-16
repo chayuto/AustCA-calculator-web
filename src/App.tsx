@@ -5,6 +5,7 @@ import {
   calculate,
   load,
   loadHistory,
+  migrate,
   save,
   saveHistory,
   type Field,
@@ -13,11 +14,15 @@ import {
 } from "./calc";
 import "./App.css";
 
-const LABELS: Record<Field, { label: string; placeholder: string }> = {
-  price: { label: "Price", placeholder: "Price" },
-  weight: { label: "Weight", placeholder: "Kg" },
-  fx: { label: "FX", placeholder: "AUD/THB" },
-  shipping: { label: "Shipping", placeholder: "AUD/KG" },
+const LABELS: Record<
+  Field,
+  { label: string; placeholder: string; inputMode: "decimal" | "numeric" }
+> = {
+  price: { label: "Price", placeholder: "Price", inputMode: "decimal" },
+  // Grams are whole numbers, so this gets the keypad without a decimal point.
+  weight: { label: "Weight", placeholder: "Grams", inputMode: "numeric" },
+  fx: { label: "FX", placeholder: "AUD/THB", inputMode: "decimal" },
+  shipping: { label: "Shipping", placeholder: "AUD/KG", inputMode: "decimal" },
 };
 
 /** The two values that change on every quote, versus the ones that rarely do. */
@@ -26,6 +31,7 @@ const RATES: Field[] = ["fx", "shipping"];
 
 /** Restores the previous session and its result in one read. */
 function initialState(): { values: Values; quote: string } {
+  migrate();
   const values = load();
   return { values, quote: calculate(values) ?? INITIAL_QUOTE };
 }
@@ -134,9 +140,9 @@ export default function App() {
           inputs.current[field] = element;
         }}
         className="row-input"
-        // Shows the decimal keypad on mobile without rejecting paste.
+        // A numeric keypad on mobile, without rejecting paste.
         type="text"
-        inputMode="decimal"
+        inputMode={LABELS[field].inputMode}
         autoComplete="off"
         autoCorrect="off"
         spellCheck={false}
@@ -203,7 +209,7 @@ export default function App() {
                 >
                   <span className="history-quote">{entry.quote}</span>
                   <span className="history-detail">
-                    {entry.values.price} &times; {entry.values.weight}kg
+                    {entry.values.price} &times; {entry.values.weight}g
                     <span className="history-rates">
                       {" "}
                       @ {entry.values.fx} / {entry.values.shipping}
